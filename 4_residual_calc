@@ -1,0 +1,53 @@
+## RESIDUAL Calculation ##
+xmin <- -94.5
+xmax <- -87.25
+ymin <- 29.75
+ymax <- 37.25
+extent_resample <- extent(xmin, xmax, ymin, ymax)
+
+#this number corresponds to the number of cells in each grace raster
+rows_per_group <- 49
+monthly_data_list <- list()
+predictions_list <- list()
+total_groups <- nrow(model_data) / rows_per_group
+split_data <- split(model_data$response_df, rep(1:total_groups, each = rows_per_group, length.out = nrow(model_data)))
+split_predictions <- split(predictions, rep(1:total_groups, each = rows_per_group, length.out = nrow(model_data)))
+
+
+for (i in seq_along(split_data)) {
+  assign(paste0("grace_nc_", i), split_data[[i]])
+}
+monthly_data_list <- split_data
+
+for (i in seq_along(split_predictions)) {
+  assign(paste0("predictions_", i), split_predictions[[i]])
+}
+predictions_list <- split_predictions
+
+
+residuals_list <- list()
+for (i in seq_along(monthly_data_list)) {
+  residuals <- monthly_data_list[[i]] - predictions_list[[i]]
+  residuals_list[[i]] <- residuals
+}
+
+#create empty raster to store residuals
+residuals_rasters <- list()
+
+#loop over each month in the monthly_data_list
+for (i in seq_along(residuals_list)) {
+  
+  residuals_df <- residuals_list[[i]]
+  residual_raster <- grace_clip
+  residual_raster[] <- residuals_df
+  residuals_rasters[[i]] <-residual_raster
+ }
+
+
+residuals_stack <- stack(residuals_rasters)
+mean_raster <- calc(residuals_stack, fun = mean, na.rm = TRUE)
+  
+#resample to a 0.25x0.25 grid using bilinear interpolation
+rast <- raster(extent_resample, res = 0.25, crs = CRS("+proj=longlat +datum=WGS84"))
+residual_raster_longterm <- mean_raster
+residual_raster_longterm <- resample(residual_raster_longterm, rast, method = "bilinear")
