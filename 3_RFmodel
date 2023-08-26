@@ -1,0 +1,37 @@
+#RANDOM FOREST MODEL#
+
+#combine predictors into a dataframe
+predictors_df <- do.call(rbind, lapply(gldas1_stacked, as.data.frame, xy = TRUE))
+predictors_df <- predictors_df[, -c(1, 2)] # Exclude x and y columns
+
+for (i in 1:length(grace_clipped_list)) {
+  names(grace_clipped_list[[i]]) <- "TWS"
+}
+
+#combine response variables into a dataframe
+response_df <- do.call(rbind, lapply(grace_clipped_list, function(x) as.data.frame(x, xy = TRUE)))
+response_df <- response_df[, -c(1, 2)] # Exclude x and y columns
+model_data <- cbind(predictors_df, response_df)
+
+set.seed(123)
+n <- nrow(model_data)
+train_rows <- sample(1:n, size = floor(0.85 * n), replace = FALSE)
+test_rows <- setdiff(1:n, train_rows)
+
+train_data <- model_data[train_rows, ]
+test_data <- model_data[test_rows, ]
+
+
+#HYPERPARAMETER TUNING
+tuned_mtry <- tuneRF(x = predictors_df, y = response_df, stepFactor = 1.5, improve = 1e-5, ntree = 665)
+print(tuned_mtry)
+
+#TRAIN MODEL
+model <- randomForest(response_df ~ ., data = train_data, ntree = 665, mtry = 7, nodesize = 4)
+print(model)
+predictor_columns <- model_data[, -ncol(model_data)]
+predictions <- predict(model, newdata = predictor_columns)
+
+
+#OOB error
+oob_error <- mean((train_data$response_df - model$predicted)^2)
