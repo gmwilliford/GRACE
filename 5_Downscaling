@@ -1,0 +1,47 @@
+##DOWNSCALING##
+corrected <- list()
+predictions_list <- vector("list", length(gldas025_stacked))
+
+#loop over each file in the gldas 0.25x0.25
+for (i in 1:length(gldas025_stacked)) {
+  predictors <- gldas025_stacked[[i]]
+  
+  #convert the stack to  data frame
+  predictors_df <- as.data.frame(predictors, xy=TRUE)
+  predictors_df <- predictors_df[, -c(1, 2)]
+    proj4string(predictors) <- CRS("+proj=longlat +datum=WGS84")
+  
+  #prediction
+  predictions <- predict(model, newdata = predictors_df)
+  predictions_list[[i]] <- predictions
+  downscale <- raster(extent_resample, res = 0.25, crs = CRS("+proj=longlat +datum=WGS84"))
+  values(downscale) <- predictions_list[[i]]
+  
+  #RESIDUAL CORRECTION
+  corrected[[i]] <- downscale + residual_raster_longterm
+}
+
+
+#reformat date
+formatted_dates <- format(middle_dates, format = "%mm/%YYYY")
+print(formatted_dates)
+
+##Calculating GWS##
+
+final_list <- list()
+for (i in 1:length(combined_surface_list)) {
+  
+  # GWS calculation
+  downscaled_raster <- corrected[[i]]
+  final_raster <- ((downscaled_raster*100) - (combined_surface_list[[i]]/10))
+  
+  # Accounting for Specific Yield 
+  final_raster <- final_raster * 0.25
+  crs <- CRS("+proj=longlat +datum=NAD83")
+  crs(final_raster) <- crs
+  date <- formatted_dates[i]
+  raster_name <- paste(date, sep = "")
+  names(final_raster) <- raster_name
+  final_list[[i]] <- final_raster
+}
+
