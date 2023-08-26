@@ -1,0 +1,70 @@
+#DETERMINING DATE RANGES
+
+#Unfortunate amount of hard coding involced here, but this script is converting
+#the yyyyddd dates of the GRACE nc files to yyyymmdd dates, in order to then identify 
+#the missing date ranges. These were then manually assigned and saved as blank nc
+#files. Run the Loading Data and Packages script first.
+
+library(lubridate)
+
+date_ranges <- list()
+
+for (file_name in grace_files) {
+  start_year <- as.integer(substr(file_name, 9, 12))
+  start_day <- as.integer(substr(file_name, 13, 15))
+  end_year <- as.integer(substr(file_name, 17, 20))
+  end_day <- as.integer(substr(file_name, 21, 23))
+  start_date <- as.Date(paste0(start_year, "-01-01")) + days(start_day - 1)
+  end_date <- as.Date(paste0(end_year, "-01-01")) + days(end_day - 1)
+  date_ranges <- c(date_ranges, list(c(start_date, end_date)))
+}
+
+
+#function to convert date strings to numeric representation
+date_to_numeric <- function(date_str) {
+  as.numeric(as.Date(date_str))
+}
+
+
+
+#ONLY RUN IF STARTING FROM SCRATCH IN THE DIRECTORY
+missing_date_ranges <- list(
+  "2002139-2002181(6)",
+  "2002182-2002212(7)",
+  "2003142-2003181(6)",
+  "2010362-2011038(1)",
+  "2011152-2011185(6)",
+  "2012111-2012152(5)",
+  "2012269-2012310(10)",
+  "2013058-2013100(3)",
+  "2013213-2013243(8)",
+  "2013244-2013273(9)",
+  "2014018-2014059(2)",
+  "2014176-2014212(7)",
+  "2014337-2015012(12)",
+  "2015132-2015179(6)",
+  "2015271-2015304(10)",
+  "2015305-2015345(11)",
+  "2016092-2016128(4)",
+  "2016248-2016274(9)",
+  "2016275-2016318(10)")
+
+
+ncpath <- "D:/Research/MASTER DATA/GRACE NC/MASTER/interp"
+ncbasename <- "GRD-3"
+
+for (i in seq_along(missing_date_ranges)) {
+  dates <- missing_date_ranges[[i]]
+  ncfname <- file.path(ncpath, paste0(ncbasename, "_", dates, "GRAC_INTERP.nc4"))
+  
+  nc_model <- grace_nc
+  londim <- ncdim_def("lon", nc_model$dim$lon$units, nc_model$dim$lon$vals)
+  latdim <- ncdim_def("lat", nc_model$dim$lat$units, nc_model$dim$lat$vals)
+  timedim <- ncdim_def("time", nc_model$dim$time$units, nc_model$dim$time$vals)
+  ncvar_def <- ncvar_def("lwe_thickness", nc_model$var$lwe_thickness$units, list(londim, latdim, timedim), NULL, prec = "single")
+  
+  #write the new NetCDF file
+  ncout <- nc_create(ncfname, ncvar_def, force_v4 = FALSE, verbose=TRUE)
+  nc_close(ncout)
+  cat("NetCDF file", ncfname, "created.\n")
+}
